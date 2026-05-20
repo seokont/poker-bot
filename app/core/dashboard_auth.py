@@ -108,15 +108,18 @@ class DashboardAuthMiddleware(BaseHTTPMiddleware):
 
 
 def set_session_cookie(response: Response, username: str) -> None:
+    settings = get_settings()
     response.set_cookie(
         key=SESSION_COOKIE,
         value=create_session_token(username),
         httponly=True,
         samesite="lax",
+        secure=settings.dashboard_cookie_secure,
         max_age=SESSION_TTL_SECONDS,
         path="/",
     )
 
 
 def clear_session_cookie(response: Response) -> None:
-    response.delete_cookie(key=SESSION_COOKIE, path="/")
+    settings = get_settings()
+    response.delete_cookie(key=SESSION_COOKIE, path="/", secure=settings.dashboard_cookie_secure)

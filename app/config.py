@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     dashboard_username: str = Field(default="admin", alias="DASHBOARD_USERNAME")
     dashboard_password: str = Field(default="change-me", alias="DASHBOARD_PASSWORD")
     dashboard_session_secret: str = Field(default="", alias="DASHBOARD_SESSION_SECRET")
+    dashboard_cookie_secure: bool = Field(default=False, alias="DASHBOARD_COOKIE_SECURE")
+    trust_proxy_headers: bool = Field(default=False, alias="TRUST_PROXY_HEADERS")
 
 
 @lru_cache

@@ -4,8 +4,10 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.api import auth, bot_actions, bot_admin, health
+from app.config import get_settings
 from app.core.dashboard_auth import DashboardAuthMiddleware
 from app.core.logging import configure_logging
 from app.integrations.database import create_database_tables
@@ -29,6 +31,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.add_middleware(DashboardAuthMiddleware)
+if get_settings().trust_proxy_headers:
+    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.include_router(health.router)
 app.include_router(auth.router)

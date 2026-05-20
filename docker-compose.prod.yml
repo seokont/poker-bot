@@ -1,0 +1,78 @@
+services:
+  bot-api:
+    build: .
+    restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips="*"
+    environment:
+      BOT_SERVER_PORT: ${BOT_SERVER_PORT:-8000}
+      DATABASE_URL: postgresql+psycopg2://bot:bot@postgres:5432/bot_server
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/1}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
+      MAIN_BACKEND_URL: ${MAIN_BACKEND_URL}
+      SERVICE_TOKEN: ${SERVICE_TOKEN}
+      BOT_JOB_QUEUE: ${BOT_JOB_QUEUE:-bot_action_queue}
+      BOT_JOB_PAYLOAD_PREFIX: ${BOT_JOB_PAYLOAD_PREFIX:-poker_bot_server:job:}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      REQUEST_TIMEOUT_SECONDS: ${REQUEST_TIMEOUT_SECONDS:-30}
+      DASHBOARD_USERNAME: ${DASHBOARD_USERNAME}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
+      DASHBOARD_SESSION_SECRET: ${DASHBOARD_SESSION_SECRET}
+      DASHBOARD_COOKIE_SECURE: ${DASHBOARD_COOKIE_SECURE:-true}
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-true}
+    ports:
+      - "127.0.0.1:${BOT_SERVER_PORT:-8000}:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  bot-worker:
+    build: .
+    restart: unless-stopped
+    command: python -m app.workers.redis_queue_worker
+    environment:
+      BOT_SERVER_PORT: ${BOT_SERVER_PORT:-8000}
+      DATABASE_URL: postgresql+psycopg2://bot:bot@postgres:5432/bot_server
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/1}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
+      MAIN_BACKEND_URL: ${MAIN_BACKEND_URL}
+      SERVICE_TOKEN: ${SERVICE_TOKEN}
+      BOT_JOB_QUEUE: ${BOT_JOB_QUEUE:-bot_action_queue}
+      BOT_JOB_PAYLOAD_PREFIX: ${BOT_JOB_PAYLOAD_PREFIX:-poker_bot_server:job:}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      REQUEST_TIMEOUT_SECONDS: ${REQUEST_TIMEOUT_SECONDS:-30}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bot_server
+      POSTGRES_USER: bot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bot}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bot -d bot_server"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
