@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Poker Bot Control Panel</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b1020;
+        --card: #141b2f;
+        --card-2: #19223a;
+        --text: #e8edf7;
+        --muted: #96a3bb;
+        --accent: #49d391;
+        --danger: #ff6575;
+        --warning: #f6c85f;
+        --border: #26324d;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top left, #1a2a4c 0, var(--bg) 42%);
+        color: var(--text);
+      }
+
+      header {
+        padding: 32px clamp(20px, 5vw, 64px) 20px;
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: center;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(28px, 4vw, 44px);
+        letter-spacing: -0.04em;
+      }
+
+      .subtitle {
+        color: var(--muted);
+        margin-top: 8px;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: rgba(20, 27, 47, 0.78);
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      main {
+        padding: 0 clamp(20px, 5vw, 64px) 48px;
+        display: grid;
+        grid-template-columns: minmax(280px, 420px) 1fr;
+        gap: 24px;
+      }
+
+      section {
+        background: rgba(20, 27, 47, 0.9);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.24);
+      }
+
+      .panel {
+        padding: 24px;
+      }
+
+      form {
+        display: grid;
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      label {
+        display: grid;
+        gap: 7px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 11px 12px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: var(--card-2);
+        color: var(--text);
+        outline: none;
+      }
+
+      textarea {
+        min-height: 96px;
+        resize: vertical;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      }
+
+      input:focus,
+      select:focus,
+      textarea:focus {
+        border-color: var(--accent);
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 12px;
+        padding: 12px 14px;
+        color: #06130d;
+        background: var(--accent);
+        font-weight: 800;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        color: var(--text);
+        background: #26324d;
+      }
+
+      button.danger {
+        color: white;
+        background: var(--danger);
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.65;
+      }
+
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .bot-card {
+        background: var(--card-2);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 18px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .bot-card--thinking {
+        border-color: var(--warning);
+        box-shadow: 0 0 0 1px rgba(246, 200, 95, 0.25);
+      }
+
+      .bot-card--disabled {
+        opacity: 0.72;
+      }
+
+      .bot-card header {
+        padding: 0;
+      }
+
+      .bot-name {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .bot-mark {
+        color: #06130d;
+        background: var(--accent);
+        border-radius: 8px;
+        padding: 4px 7px;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .status {
+        color: var(--accent);
+        font-weight: 800;
+      }
+
+      .status.off {
+        color: var(--danger);
+      }
+
+      .status.thinking {
+        color: var(--warning);
+      }
+
+      .bot-info {
+        display: grid;
+        gap: 12px;
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: rgba(12, 19, 37, 0.66);
+      }
+
+      .block-title {
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .info-grid {
+        display: grid;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .info-grid strong {
+        color: var(--text);
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 6px 9px;
+        background: rgba(20, 27, 47, 0.78);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .chip.ok {
+        color: var(--accent);
+      }
+
+      .chip.warn {
+        color: var(--warning);
+      }
+
+      .stats {
+        display: grid;
+        gap: 8px;
+      }
+
+      .stat-row {
+        display: grid;
+        grid-template-columns: 120px 1fr 44px;
+        gap: 10px;
+        align-items: center;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .bar {
+        height: 8px;
+        background: #0c1325;
+        border-radius: 999px;
+        overflow: hidden;
+      }
+
+      .bar span {
+        display: block;
+        height: 100%;
+        background: linear-gradient(90deg, var(--accent), var(--warning));
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .actions button {
+        flex: 1 1 auto;
+      }
+
+      .empty,
+      .message {
+        color: var(--muted);
+        border: 1px dashed var(--border);
+        border-radius: 16px;
+        padding: 18px;
+      }
+
+      .message {
+        margin-top: 14px;
+      }
+
+      .wide-panel {
+        grid-column: 1 / -1;
+      }
+
+      .guide {
+        margin: 0 0 18px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      @media (max-width: 900px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+
+        .cards {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 640px) {
+        .cards {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Bot Control Panel</h1>
+        <p class="subtitle">Create profiles, enable or disable bots, and keep BOT labeling explicit.</p>
+      </div>
+      <div class="header-actions">
+        <span class="badge" id="user-badge">BOT only service</span>
+        <button class="secondary" type="button" id="logout">Log Out</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel">
+        <h2>Bot Profile</h2>
+        <form id="bot-form">
+          <label>
+            Bot ID
+            <input name="botId" placeholder="bot-001" required />
+          </label>
+
+          <label>
+            Display name
+            <input name="displayName" placeholder="BOT Grinder 1" />
+          </label>
+
+          <label>
+            Profile type
+            <select name="profileType" id="profile-type"></select>
+          </label>
+
+          <label>
+            Game/Table ID
+            <input name="targetTableId" placeholder="table_id from Game Engine" />
+          </label>
+
+          <label>
+            Preferred seat
+            <input name="preferredSeat" type="number" min="0" placeholder="optional" />
+          </label>
+
+          <div class="grid-2">
+            <label>
+              Aggression
+              <input name="aggression" type="number" min="0" max="1" step="0.01" placeholder="auto" />
+            </label>
+            <label>
+              Looseness
+              <input name="looseness" type="number" min="0" max="1" step="0.01" placeholder="auto" />
+            </label>
+          </div>
+
+          <div class="grid-2">
+            <label>
+              Bluff freq
+              <input name="bluffFrequency" type="number" min="0" max="1" step="0.01" placeholder="auto" />
+            </label>
+            <label>
+              Mistake rate
+              <input name="mistakeRate" type="number" min="0" max="1" step="0.01" placeholder="auto" />
+            </label>
+          </div>
+
+          <label>
+            Status
+            <select name="enabled">
+              <option value="true">Enabled</option>
+              <option value="false">Disabled</option>
+            </select>
+          </label>
+
+          <button type="submit">Save Profile</button>
+          <button class="secondary" type="button" id="reset-form">Clear Form</button>
+        </form>
+        <div id="message" class="message" hidden></div>
+      </section>
+
+      <section class="panel">
+        <div class="toolbar">
+          <h2>Bots</h2>
+          <button class="secondary" type="button" id="refresh">Refresh</button>
+        </div>
+        <p class="guide">
+          Each card shows one BOT profile and runtime state. Set the Game/Table ID on the bot profile,
+          then click “Connect to Game”. The main backend still validates seating and every action.
+        </p>
+        <div id="bots" class="cards"></div>
+      </section>
+
+    </main>
+
+    <script>
+      const form = document.querySelector("#bot-form");
+      const botsContainer = document.querySelector("#bots");
+      const profileTypeSelect = document.querySelector("#profile-type");
+      const message = document.querySelector("#message");
+
+      const showMessage = (text, isError = false) => {
+        message.hidden = false;
+        message.textContent = text;
+        message.style.color = isError ? "var(--danger)" : "var(--accent)";
+      };
+
+      const request = async (url, options = {}) => {
+        const { headers = {}, body, ...rest } = options;
+        const normalizedBody = body && typeof body !== "string" ? JSON.stringify(body) : body;
+        const response = await fetch(url, {
+          ...rest,
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", ...headers },
+          body: normalizedBody,
+        });
+        if (response.status === 401) {
+          window.location.href = "/login";
+          throw new Error("login required");
+        }
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || `HTTP ${response.status}`);
+        }
+        return response.json();
+      };
+
+      const percent = (value) => `${Math.round((value || 0) * 100)}%`;
+
+      const renderStat = (label, value) => `
+        <div class="stat-row">
+          <span>${label}</span>
+          <div class="bar"><span style="width: ${percent(value)}"></span></div>
+          <strong>${percent(value)}</strong>
+        </div>
+      `;
+
+      const profileHint = (type) => {
+        const hints = {
+          BEGINNER: "Beginner: more mistakes and simple decisions",
+          TIGHT_PASSIVE: "Tight-passive: narrow range, more call/check",
+          TIGHT_AGGRESSIVE: "TAG: strong hands and aggressive raises",
+          LOOSE_PASSIVE: "Loose-passive: wide range, calls often",
+          LOOSE_AGGRESSIVE: "LAG: wide range, more bluffs",
+          BALANCED: "Balanced: solid default strategy",
+        };
+        return hints[type] || "Bot profile";
+      };
+
+      const botRuntimeStatus = (bot) => {
+        if (!bot.enabled) return { label: "Disabled", className: "off" };
+        if (bot.state?.status === "thinking") return { label: "Thinking", className: "thinking" };
+        if (bot.state?.status === "left_game") return { label: "Off Table", className: "off" };
+        if (bot.state?.status === "acted") return { label: "Acted", className: "" };
+        return { label: "Ready", className: "" };
+      };
+
+      const cardClass = (bot) => {
+        const classes = ["bot-card"];
+        if (!bot.enabled) classes.push("bot-card--disabled");
+        if (bot.state?.status === "thinking") classes.push("bot-card--thinking");
+        return classes.join(" ");
+      };
+
+      const renderBots = (bots) => {
+        if (!bots.length) {
+          botsContainer.innerHTML = '<div class="empty">No profiles yet. Create the first BOT on the left.</div>';
+          return;
+        }
+
+        botsContainer.innerHTML = bots
+          .map(
+            (bot) => {
+              const runtime = botRuntimeStatus(bot);
+              return `
+              <article class="${cardClass(bot)}">
+                <header>
+                  <div>
+                    <h3 class="bot-name"><span class="bot-mark">BOT</span>${bot.displayName}</h3>
+                    <p class="subtitle">${bot.botId} · ${bot.profileType}</p>
+                  </div>
+                  <span class="status ${runtime.className}">${runtime.label}</span>
+                </header>
+
+                <div class="bot-info">
+                  <div class="block-title">Bot Information</div>
+                  <div class="info-grid">
+                    <div><strong>Style:</strong> ${profileHint(bot.profileType)}</div>
+                    <div><strong>Last action:</strong> ${bot.state?.lastAction || "none yet"}</div>
+                    <div><strong>Assigned game:</strong> ${bot.targetTableId || "not set"}</div>
+                    <div><strong>Current table:</strong> ${bot.state?.tableId || "not seated"}</div>
+                  </div>
+
+                  <div class="chips">
+                    <span class="chip ok">VPIP ${bot.vpip ?? "-"}%</span>
+                    <span class="chip ok">PFR ${bot.pfr ?? "-"}%</span>
+                    <span class="chip">Bluff ${bot.bluffChance ?? Math.round((bot.bluffFrequency || 0) * 100)}%</span>
+                    <span class="chip warn">Mistakes ${bot.mistakeChance ?? Math.round((bot.mistakeRate || 0) * 100)}%</span>
+                  </div>
+
+                  <div class="stats">
+                    ${renderStat("Aggression", bot.aggression)}
+                    ${renderStat("Looseness", bot.looseness)}
+                    ${renderStat("Bluff", bot.bluffFrequency)}
+                    ${renderStat("Mistakes", bot.mistakeRate)}
+                  </div>
+                </div>
+                <div class="actions">
+                  <button type="button" onclick="editBot('${bot.botId}')">Edit</button>
+                  <button
+                    class="secondary"
+                    type="button"
+                    title="${bot.targetTableId ? "Send bot-join to the main backend" : "Edit the bot and set Game/Table ID first"}"
+                    onclick="joinBotGame('${bot.botId}')"
+                    ${bot.targetTableId ? "" : "disabled"}
+                  >
+                    ${bot.targetTableId ? "Connect to Game" : "Set Game ID First"}
+                  </button>
+                  <button
+                    class="secondary"
+                    type="button"
+                    title="${bot.state?.tableId || bot.targetTableId ? `Remove bot from table ${bot.state?.tableId || bot.targetTableId}` : "Bot is not assigned to a game"}"
+                    onclick="leaveBotGame('${bot.botId}')"
+                    ${bot.state?.tableId || bot.targetTableId ? "" : "disabled"}
+                  >
+                    Remove from Game
+                  </button>
+                  <button
+                    type="button"
+                    class="${bot.enabled ? "danger" : "secondary"}"
+                    onclick="toggleBot('${bot.botId}', ${bot.enabled})"
+                  >
+                    ${bot.enabled ? "Disable" : "Enable"}
+                  </button>
+                  <button class="danger" type="button" onclick="deleteBot('${bot.botId}', '${bot.displayName}')">Delete</button>
+                </div>
+              </article>
+            `;
+            }
+          )
+          .join("");
+      };
+
+      const loadProfileTypes = async () => {
+        const data = await request("/bot-profile-types");
+        profileTypeSelect.innerHTML = data.profileTypes
+          .map((type) => `<option value="${type}">${type}</option>`)
+          .join("");
+      };
+
+      const loadBots = async () => {
+        const data = await request("/bots");
+        window.currentBots = data.bots;
+        renderBots(data.bots);
+      };
+
+      const nullableNumber = (value) => {
+        if (value === null || value === undefined || value === "") return null;
+        return Number(value);
+      };
+
+      window.editBot = (botId) => {
+        const bot = window.currentBots.find((item) => item.botId === botId);
+        if (!bot) return;
+        form.botId.value = bot.botId;
+        form.displayName.value = bot.displayName;
+        form.profileType.value = bot.profileType;
+        form.targetTableId.value = bot.targetTableId || "";
+        form.preferredSeat.value = bot.preferredSeat ?? "";
+        form.aggression.value = bot.aggression;
+        form.looseness.value = bot.looseness;
+        form.bluffFrequency.value = bot.bluffFrequency;
+        form.mistakeRate.value = bot.mistakeRate;
+        form.enabled.value = String(bot.enabled);
+        showMessage(`Editing ${bot.displayName}`);
+      };
+
+      window.toggleBot = async (botId, enabled) => {
+        await request(`/bots/${botId}/${enabled ? "disable" : "enable"}`, { method: "POST" });
+        await loadBots();
+      };
+
+      window.joinBotGame = async (botId) => {
+        try {
+          const result = await request(`/bots/${botId}/join`, { method: "POST" });
+          showMessage(`Join request sent: ${result.botId} -> ${result.tableId}`);
+          await loadBots();
+        } catch (error) {
+          showMessage(`Failed to connect to game: ${error.message}`, true);
+        }
+      };
+
+      window.leaveBotGame = async (botId) => {
+        const bot = window.currentBots.find((item) => item.botId === botId);
+        const defaultTableId = bot?.state?.tableId || bot?.targetTableId || "";
+        const tableId = window.prompt(
+          `Enter the table ID to remove ${bot?.displayName || botId} from. The bot profile will stay in the dashboard.`,
+          defaultTableId
+        );
+        if (tableId === null) return;
+        const trimmedTableId = tableId.trim();
+        if (!trimmedTableId) {
+          showMessage("Table ID is required to remove the bot from a game", true);
+          return;
+        }
+        try {
+          const result = await request(`/bots/${botId}/leave`, { method: "POST", body: { tableId: trimmedTableId } });
+          showMessage(`Bot removed from game: ${result.botId} from table ${result.tableId}`);
+          await loadBots();
+        } catch (error) {
+          showMessage(`Failed to remove from game: ${error.message}`, true);
+        }
+      };
+
+      window.deleteBot = async (botId, displayName) => {
+        const confirmed = window.confirm(`Delete ${displayName || botId}? This removes the bot profile from bot-server.`);
+        if (!confirmed) return;
+        try {
+          await request(`/bots/${botId}`, { method: "DELETE" });
+          showMessage(`Bot deleted: ${displayName || botId}`);
+          await loadBots();
+        } catch (error) {
+          showMessage(`Delete failed: ${error.message}`, true);
+        }
+      };
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const data = Object.fromEntries(new FormData(form).entries());
+        const payload = {
+          botId: data.botId.trim(),
+          displayName: data.displayName || null,
+          profileType: data.profileType,
+          enabled: data.enabled === "true",
+          targetTableId: data.targetTableId.trim() || null,
+          preferredSeat: nullableNumber(data.preferredSeat),
+        };
+
+        for (const field of ["aggression", "looseness", "bluffFrequency", "mistakeRate"]) {
+          if (data[field] !== "") payload[field] = Number(data[field]);
+        }
+
+        try {
+          const saved = await request("/bots", { method: "POST", body: JSON.stringify(payload) });
+          showMessage(`Saved ${saved.displayName}`);
+          form.reset();
+          await loadBots();
+        } catch (error) {
+          showMessage(`Error: ${error.message}`, true);
+        }
+      });
+
+      document.querySelector("#refresh").addEventListener("click", loadBots);
+      document.querySelector("#reset-form").addEventListener("click", () => {
+        form.reset();
+        message.hidden = true;
+      });
+      document.querySelector("#logout").addEventListener("click", async () => {
+        await fetch("/auth/logout", { method: "POST", credentials: "same-origin" });
+        window.location.href = "/login";
+      });
+
+      const bootstrap = async () => {
+        const me = await fetch("/auth/me", { credentials: "same-origin" });
+        if (!me.ok) {
+          window.location.href = "/login";
+          return;
+        }
+        const user = await me.json();
+        document.querySelector("#user-badge").textContent = `Signed in as ${user.username}`;
+        await Promise.all([loadProfileTypes(), loadBots()]);
+      };
+
+      bootstrap().catch((error) => showMessage(`Load failed: ${error.message}`, true));
+    </script>
+  </body>
+</html>

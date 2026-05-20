@@ -1,0 +1,78 @@
+services:
+  bot-api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    environment:
+      BOT_SERVER_PORT: ${BOT_SERVER_PORT:-8000}
+      # Inside Compose, DB host must be the service name `postgres`.
+      # Avoid ${DATABASE_URL} from host .env here: running API on the host needs 127.0.0.1, not `postgres`.
+      DATABASE_URL: postgresql+psycopg2://bot:bot@postgres:5432/bot_server
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/1}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
+      MAIN_BACKEND_URL: ${MAIN_BACKEND_URL:-http://host.docker.internal:4000}
+      SERVICE_TOKEN: ${SERVICE_TOKEN:-dev-bot-secret-123456789}
+      BOT_JOB_QUEUE: ${BOT_JOB_QUEUE:-bot_action_queue}
+      BOT_JOB_PAYLOAD_PREFIX: ${BOT_JOB_PAYLOAD_PREFIX:-poker_bot_server:job:}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      REQUEST_TIMEOUT_SECONDS: ${REQUEST_TIMEOUT_SECONDS:-30}
+      DASHBOARD_USERNAME: ${DASHBOARD_USERNAME:-admin}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-change-me}
+      DASHBOARD_SESSION_SECRET: ${DASHBOARD_SESSION_SECRET:-change-dashboard-session-secret}
+    ports:
+      - "${BOT_SERVER_PORT:-8000}:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  bot-worker:
+    build: .
+    command: python -m app.workers.redis_queue_worker
+    environment:
+      BOT_SERVER_PORT: ${BOT_SERVER_PORT:-8000}
+      DATABASE_URL: postgresql+psycopg2://bot:bot@postgres:5432/bot_server
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/1}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
+      MAIN_BACKEND_URL: ${MAIN_BACKEND_URL:-http://host.docker.internal:4000}
+      SERVICE_TOKEN: ${SERVICE_TOKEN:-dev-bot-secret-123456789}
+      BOT_JOB_QUEUE: ${BOT_JOB_QUEUE:-bot_action_queue}
+      BOT_JOB_PAYLOAD_PREFIX: ${BOT_JOB_PAYLOAD_PREFIX:-poker_bot_server:job:}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      REQUEST_TIMEOUT_SECONDS: ${REQUEST_TIMEOUT_SECONDS:-30}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: bot_server
+      POSTGRES_USER: bot
+      POSTGRES_PASSWORD: bot
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bot -d bot_server"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
