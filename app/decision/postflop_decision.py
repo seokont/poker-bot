@@ -6,6 +6,7 @@ from app.decision.draw_detector import detect_draws
 from app.decision.game_rules import is_omaha
 from app.decision.hand_types import HandRank
 from app.decision.hand_strength import combined_strength, evaluate_draw_strength, evaluate_hand
+from app.decision.equity_calculator import calculate_hero_equity
 from app.decision.pot_odds import calculate_pot_odds, call_amount
 from app.schemas.bot_action_schema import BotAction, BotActionProposal
 from app.schemas.bot_job_schema import BotTurnJob
@@ -129,8 +130,18 @@ def decide_postflop(job: BotTurnJob, profile: BotProfile) -> BotActionProposal:
     if multiway and made_category in {"MEDIUM", "WEAK"}:
         equity_estimate *= 0.80
 
+    mc_equity, range_source = calculate_hero_equity(job)
+    if mc_equity is not None:
+        equity_estimate = max(equity_estimate, mc_equity)
+
     if BotAction.CALL in job.legal_actions and equity_estimate >= odds:
-        return BotActionProposal(action=BotAction.CALL, amount=call_cost, reason="Pot odds justify continuing with made hand or draw equity")
+        equity_note = f" MC {mc_equity:.0%}" if mc_equity is not None else ""
+        range_note = f" vs {range_source}" if range_source else " vs range"
+        return BotActionProposal(
+            action=BotAction.CALL,
+            amount=call_cost,
+            reason=f"Pot odds OK; equity {equity_estimate:.0%}{range_note}{equity_note}",
+        )
 
     if passive and BotAction.CALL in job.legal_actions and made_category == "MEDIUM" and pressure_ratio <= 0.22:
         return BotActionProposal(action=BotAction.CALL, amount=call_cost, reason="Tight-passive profile controls pot")

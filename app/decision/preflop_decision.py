@@ -4,6 +4,8 @@ from app.bots.bot_profiles import BotProfile, BotProfileType
 from app.decision.bet_sizing import all_in_amount
 from app.decision.bluff_logic import should_make_mistake
 from app.decision.game_rules import is_omaha
+from app.decision.omaha_preflop_charts import lookup_omaha_preflop_chart
+from app.decision.preflop_charts import lookup_preflop_chart
 from app.decision.hand_strength import card_rank, card_suit, evaluate_preflop_strength
 from app.decision.hand_evaluator import classify_omaha_starting_hand, evaluate_omaha_preflop_hole
 from app.decision.pot_odds import calculate_pot_odds, call_amount
@@ -13,6 +15,15 @@ from app.schemas.game_state_schema import Position
 
 
 def decide_preflop(job: BotTurnJob, profile: BotProfile) -> BotActionProposal:
+    if is_omaha(job.game_type):
+        chart_proposal = _try_preflop_chart(job, profile, lookup_omaha_preflop_chart)
+        if chart_proposal is not None:
+            return chart_proposal
+    else:
+        chart_proposal = _try_preflop_chart(job, profile, lookup_preflop_chart)
+        if chart_proposal is not None:
+            return chart_proposal
+
     if is_omaha(job.game_type):
         hand_group = classify_omaha_starting_hand(job.bot_hole_cards, job.game_type)
         hand_group = _adjust_omaha_preflop_group(hand_group, job)
@@ -134,6 +145,45 @@ def decide_preflop(job: BotTurnJob, profile: BotProfile) -> BotActionProposal:
         return BotActionProposal(action=BotAction.CALL, amount=call_cost, reason="Loose profile calls weak hand too wide")
 
     return _fold_or_check(job, f"{hand_group.lower()} hand folds facing raise")
+
+
+def _try_preflop_chart(job: BotTurnJob, profile: BotProfile, lookup_fn) -> BotActionProposal | None:
+    advice = lookup_fn(job)
+    call_cost = call_amount(job.current_bet, job.bot_current_bet, job.bot_stack)
+    facing_raise = job.current_bet > job.big_blind
+    aggressive = profile.profile_type in {BotProfileType.TIGHT_AGGRESSIVE, BotProfileType.LOOSE_AGGRESSIVE}
+
+    if advice.action == "FOLD":
+        if facing_raise or advice.chart_key.startswith("open."):
+            return _fold_or_check(job, advice.reason)
+        return None
+
+    if advice.action == "OPEN":
+        if not facing_raise and BotAction.RAISE in job.legal_actions:
+            return BotActionProposal(
+                action=BotAction.RAISE,
+                amount=_open_raise_amount(job, 2.4, 3.5),
+                reason=advice.reason,
+            )
+        if not facing_raise and BotAction.CHECK in job.legal_actions and job.position == Position.BIG_BLIND:
+            return BotActionProposal(action=BotAction.CHECK, amount=None, reason=advice.reason)
+        return None
+
+    if advice.action == "CALL":
+        if BotAction.CALL in job.legal_actions:
+            return BotActionProposal(action=BotAction.CALL, amount=call_cost, reason=advice.reason)
+        return _fold_or_check(job, advice.reason)
+
+    if advice.action == "THREE_BET" and aggressive and BotAction.RAISE in job.legal_actions:
+        return BotActionProposal(
+            action=BotAction.RAISE,
+            amount=_three_bet_amount(job),
+            reason=advice.reason,
+        )
+    if advice.action == "THREE_BET" and BotAction.CALL in job.legal_actions:
+        return BotActionProposal(action=BotAction.CALL, amount=call_cost, reason=f"{advice.reason}; flat instead of 3-bet")
+
+    return None
 
 
 def _adjust_omaha_preflop_group(hand_group: str, job: BotTurnJob) -> str:

@@ -2,6 +2,8 @@
 
 Скопируй этот документ целиком в задачу / Cursor / чат для репозитория **game backend** (`/opt/poker`, NestJS).
 
+**Чеклист для команды:** [GAME-BACKEND-REQUIREMENTS.md](./GAME-BACKEND-REQUIREMENTS.md) · **Движок бота:** [DECISION-ENGINE.md](./DECISION-ENGINE.md)
+
 ---
 
 ## Роль и границы

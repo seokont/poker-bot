@@ -1,0 +1,53 @@
+{
+  "open": {
+    "UTG": "77+,ATs+,KQs,AQo+,AKo",
+    "MIDDLE": "66+,A9s+,KTs+,QTs+,JTs,AJo+,KQo",
+    "LATE": "55+,A5s+,K9s+,Q9s+,J9s+,T9s,98s,A9o+,KTo+,QJo",
+    "BUTTON": "22+,A2s+,K8s+,Q8s+,J8s+,T8s+,98s,87s,76s,A8o+,K9o+,Q9o+,J9o+",
+    "SMALL_BLIND": "55+,A9s+,KTs+,QTs+,JTs,AJo+,KQo",
+    "BIG_BLIND": "22+,A2s+,K9s+,Q9s+,J9s+,T9s,98s,A9o+,KTo+,QJo"
+  },
+  "facing_raise": {
+    "UTG": "TT+,AQs+,AKo",
+    "MIDDLE": "99+,AJs+,KQs,AQo+",
+    "LATE": "88+,ATs+,KJs+,QJs,AJo+,KQo",
+    "BUTTON": "66+,A9s+,KTs+,QTs+,JTs,AJo+,KQo",
+    "SMALL_BLIND": "99+,AJs+,KQs,AQo+",
+    "BIG_BLIND": "77+,AJs+,KQs,QJs,AJo+,KQo"
+  },
+  "facing_raise_ip": {
+    "DEFAULT": "77+,AJs+,KQs,QJs,AJo+,KQo",
+    "BUTTON": "66+,A9s+,KTs+,QTs+,JTs,AJo+,KQo",
+    "LATE": "88+,ATs+,KJs+,QJs,AJo+,KQo"
+  },
+  "facing_raise_oop": {
+    "DEFAULT": "99+,AJs+,KQs,AQo+",
+    "UTG": "TT+,AQs+,AKo",
+    "SMALL_BLIND": "TT+,AQs+,AKo"
+  },
+  "bb_defend_vs_steal": {
+    "vs_BUTTON": "55+,A5s+,K9s+,Q9s+,J9s+,T9s,98s,87s,A9o+,KTo+,QJo",
+    "vs_SMALL_BLIND": "66+,A8s+,K9s+,Q9s+,J9s+,T9s,A9o+,KTo+,QJo",
+    "DEFAULT": "77+,A9s+,KTs+,QTs+,JTs,AJo+,KQo"
+  },
+  "facing_large_raise": {
+    "DEFAULT": "TT+,AQs+,AKo",
+    "IP": "TT+,AQs+,AKo",
+    "OOP": "QQ+,AKs,AKo"
+  },
+  "three_bet": {
+    "DEFAULT": "QQ+,AKs,AKo,AQs"
+  },
+  "three_bet_ip": {
+    "DEFAULT": "QQ+,AKs,AKo,AQs,JJ+",
+    "BUTTON": "TT+,AQs+,AKo,99+"
+  },
+  "three_bet_oop": {
+    "DEFAULT": "QQ+,AKs,AKo",
+    "SMALL_BLIND": "QQ+,AKs,AKo,AQs"
+  },
+  "four_bet_call": {
+    "DEFAULT": "TT+,AQs+,AKo",
+    "IP": "99+,AQs+,AKo"
+  }
+}

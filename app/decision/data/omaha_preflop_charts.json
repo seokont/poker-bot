@@ -1,0 +1,24 @@
+{
+  "open": {
+    "UTG": {"min_combo_hits": 2, "range": "TT+,AJs+,KQs,AQo+"},
+    "MIDDLE": {"min_combo_hits": 2, "range": "99+,ATs+,KJs+,QJs,AJo+"},
+    "LATE": {"min_combo_hits": 1, "range": "88+,A9s+,KTs+,QTs+,JTs,AJo+,KQo"},
+    "BUTTON": {"min_combo_hits": 1, "range": "66+,A8s+,K9s+,Q9s+,J9s+,T9s,A9o+,KTo+,QJo"},
+    "SMALL_BLIND": {"min_combo_hits": 2, "range": "99+,AJs+,KQs,AQo+"},
+    "BIG_BLIND": {"min_combo_hits": 1, "range": "77+,A9s+,KTs+,QTs+,JTs,AJo+,KQo"}
+  },
+  "facing_raise": {
+    "DEFAULT": {"min_combo_hits": 2, "range": "TT+,AQs+,AKo"},
+    "IP": {"min_combo_hits": 2, "range": "99+,AJs+,KQs,AQo+"},
+    "OOP": {"min_combo_hits": 2, "range": "QQ+,AKs,AKo,AQs"}
+  },
+  "bb_defend_vs_steal": {
+    "DEFAULT": {"min_combo_hits": 2, "range": "88+,ATs+,KJs+,QJs,AJo+,KQo"}
+  },
+  "three_bet": {
+    "DEFAULT": {"min_combo_hits": 3, "range": "QQ+,AKs,AKo,AQs"}
+  },
+  "facing_large_raise": {
+    "DEFAULT": {"min_combo_hits": 3, "range": "QQ+,AKs,AKo"}
+  }
+}

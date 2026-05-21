@@ -33,6 +33,19 @@ class Settings(BaseSettings):
         description="How long to wait for another worker's turn lock before sending anyway.",
     )
     bot_action_send_retries: int = Field(default=3, alias="BOT_ACTION_SEND_RETRIES")
+    bot_equity_enabled: bool = Field(default=True, alias="BOT_EQUITY_ENABLED")
+    bot_equity_sample_count: int = Field(
+        default=300,
+        alias="BOT_EQUITY_SAMPLE_COUNT",
+        ge=100,
+        le=5000,
+        description="Monte Carlo samples for PokerKit calculate_equities (300 is faster on small VPS).",
+    )
+    bot_use_action_history: bool = Field(
+        default=True,
+        alias="BOT_USE_ACTION_HISTORY",
+        description="Tighten/widen villain range using job.previousActions when available.",
+    )
     request_timeout_seconds: float = Field(
         default=30.0,
         alias="REQUEST_TIMEOUT_SECONDS",
