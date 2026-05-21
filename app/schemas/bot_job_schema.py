@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.decision.game_rules import expected_hole_card_count, is_supported_game_type
 from app.schemas.bot_action_schema import BotAction
 from app.schemas.game_state_schema import GameType, Position, Street
 
@@ -19,7 +20,7 @@ class BotTurnJob(BaseModel):
     turn_id: str = Field(default="current", alias="turnId", min_length=1)
     street: Street
     game_type: GameType = Field(alias="gameType")
-    bot_hole_cards: list[str] = Field(alias="botHoleCards", min_length=2, max_length=2)
+    bot_hole_cards: list[str] = Field(alias="botHoleCards", min_length=2, max_length=7)
     board_cards: list[str] = Field(default_factory=list, alias="boardCards", max_length=5)
     pot_size: int = Field(alias="potSize", ge=0)
     current_bet: int = Field(alias="currentBet", ge=0)
@@ -42,8 +43,11 @@ class BotTurnJob(BaseModel):
 
     @model_validator(mode="after")
     def validate_visible_card_counts(self) -> "BotTurnJob":
-        if self.game_type not in {GameType.NO_LIMIT_HOLDEM, GameType.TEXAS_HOLDEM, GameType.NLH}:
-            raise ValueError(f"{self.game_type} is planned but not implemented yet")
+        if not is_supported_game_type(self.game_type):
+            raise ValueError(f"{self.game_type} is not supported by bot-server")
+        expected_hole_cards = expected_hole_card_count(self.game_type)
+        if len(self.bot_hole_cards) != expected_hole_cards:
+            raise ValueError(f"{self.game_type} requires exactly {expected_hole_cards} hole cards")
         expected_board_cards = {
             Street.PREFLOP: 0,
             Street.FLOP: 3,

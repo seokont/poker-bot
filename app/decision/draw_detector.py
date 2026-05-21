@@ -1,7 +1,10 @@
 from collections import Counter
 from dataclasses import dataclass
+from itertools import combinations
 
+from app.decision.game_rules import is_omaha
 from app.decision.hand_strength import RANK_VALUE, card_rank, card_suit, has_near_straight
+from app.schemas.game_state_schema import GameType
 
 
 @dataclass(frozen=True)
@@ -16,7 +19,37 @@ class DrawInfo:
     equity_estimate: float
 
 
-def detect_draws(hole_cards: list[str], board_cards: list[str]) -> DrawInfo:
+def detect_draws(
+    hole_cards: list[str],
+    board_cards: list[str],
+    game_type: GameType = GameType.NLH,
+) -> DrawInfo:
+    if is_omaha(game_type) and len(board_cards) >= 3:
+        return _best_omaha_draw(hole_cards, board_cards)
+    return _detect_holdem_draws(hole_cards, board_cards)
+
+
+def _best_omaha_draw(hole_cards: list[str], board_cards: list[str]) -> DrawInfo:
+    best = _empty_draw()
+    board_sets = [board_cards] if len(board_cards) == 3 else [board_cards[:3], board_cards[:4], board_cards[:5]]
+    seen: set[tuple[str, ...]] = set()
+    for board in board_sets:
+        if len(board) < 3:
+            continue
+        for board_triple in combinations(board, 3):
+            board_key = tuple(sorted(board_triple))
+            for hole_pair in combinations(hole_cards, 2):
+                key = (tuple(sorted(hole_pair)), board_key)
+                if key in seen:
+                    continue
+                seen.add(key)
+                info = _detect_holdem_draws(list(hole_pair), list(board_triple))
+                if info.equity_estimate > best.equity_estimate:
+                    best = info
+    return best
+
+
+def _detect_holdem_draws(hole_cards: list[str], board_cards: list[str]) -> DrawInfo:
     cards = hole_cards + board_cards
     suits = Counter(card_suit(card) for card in cards)
     ranks = sorted(set(RANK_VALUE[card_rank(card)] for card in cards))
@@ -43,6 +76,10 @@ def detect_draws(hole_cards: list[str], board_cards: list[str]) -> DrawInfo:
         equity += 0.10
 
     return DrawInfo(flush_draw, nut_flush_draw, open_ended, gutshot, combo, overcards, backdoor, min(0.85, equity))
+
+
+def _empty_draw() -> DrawInfo:
+    return DrawInfo(False, False, False, False, False, 0, False, 0.0)
 
 
 def _has_open_ended_draw(ranks: list[int]) -> bool:

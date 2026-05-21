@@ -3,12 +3,13 @@ from app.decision.postflop_decision import decide_postflop
 from app.decision.preflop_decision import decide_preflop
 from app.schemas.bot_action_schema import BotAction, BotActionProposal
 from app.schemas.bot_job_schema import BotTurnJob
-from app.schemas.game_state_schema import GameType, Street
+from app.decision.game_rules import SUPPORTED_GAME_TYPES
+from app.schemas.game_state_schema import Street
 
 
 class DecisionEngine:
     def decide(self, job: BotTurnJob, profile: BotProfile) -> BotActionProposal:
-        if job.game_type not in {GameType.NO_LIMIT_HOLDEM, GameType.NLH, GameType.TEXAS_HOLDEM}:
+        if job.game_type not in SUPPORTED_GAME_TYPES:
             return self.safe_default(job, f"Unsupported game type {job.game_type}")
         if job.street == Street.PREFLOP:
             return decide_preflop(job, profile)

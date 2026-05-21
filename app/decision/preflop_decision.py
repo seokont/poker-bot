@@ -3,7 +3,9 @@ import random
 from app.bots.bot_profiles import BotProfile, BotProfileType
 from app.decision.bet_sizing import all_in_amount
 from app.decision.bluff_logic import should_make_mistake
-from app.decision.hand_strength import card_rank, card_suit
+from app.decision.game_rules import is_omaha
+from app.decision.hand_strength import card_rank, card_suit, evaluate_preflop_strength
+from app.decision.hand_evaluator import classify_omaha_starting_hand, evaluate_omaha_preflop_hole
 from app.decision.pot_odds import calculate_pot_odds, call_amount
 from app.schemas.bot_action_schema import BotAction, BotActionProposal
 from app.schemas.bot_job_schema import BotTurnJob
@@ -11,7 +13,12 @@ from app.schemas.game_state_schema import Position
 
 
 def decide_preflop(job: BotTurnJob, profile: BotProfile) -> BotActionProposal:
-    hand_group = classify_starting_hand(job.bot_hole_cards)
+    if is_omaha(job.game_type):
+        hand_group = classify_omaha_starting_hand(job.bot_hole_cards, job.game_type)
+        hand_group = _adjust_omaha_preflop_group(hand_group, job)
+    else:
+        hand_group = classify_starting_hand(job.bot_hole_cards)
+        hand_group = _adjust_preflop_group(hand_group, job)
     call_cost = call_amount(job.current_bet, job.bot_current_bet, job.bot_stack)
     odds = calculate_pot_odds(job.pot_size, call_cost)
     short_stack = job.bot_stack <= job.big_blind * 10
@@ -127,6 +134,30 @@ def decide_preflop(job: BotTurnJob, profile: BotProfile) -> BotActionProposal:
         return BotActionProposal(action=BotAction.CALL, amount=call_cost, reason="Loose profile calls weak hand too wide")
 
     return _fold_or_check(job, f"{hand_group.lower()} hand folds facing raise")
+
+
+def _adjust_omaha_preflop_group(hand_group: str, job: BotTurnJob) -> str:
+    evaluation = evaluate_omaha_preflop_hole(job.bot_hole_cards, job.game_type)
+    if evaluation.strength >= 0.70 and hand_group not in {"PREMIUM"}:
+        return "VERY_STRONG"
+    if evaluation.strength < 0.30 and hand_group in {"MEDIUM", "SPECULATIVE"}:
+        return "WEAK"
+    return hand_group
+
+
+def _adjust_preflop_group(hand_group: str, job: BotTurnJob) -> str:
+    strength = evaluate_preflop_strength(
+        job.bot_hole_cards,
+        job.position.value,
+        job.active_players_count,
+    )
+    if strength >= 0.82 and hand_group not in {"PREMIUM"}:
+        return "VERY_STRONG"
+    if strength >= 0.68 and hand_group in {"WEAK", "SPECULATIVE"}:
+        return "MEDIUM"
+    if strength < 0.28 and hand_group in {"MEDIUM", "SPECULATIVE"}:
+        return "WEAK"
+    return hand_group
 
 
 def classify_starting_hand(hole_cards: list[str]) -> str:

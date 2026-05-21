@@ -3,18 +3,23 @@ from app.decision.bet_sizing import BetSize, all_in_amount, size_bet
 from app.decision.bluff_logic import should_bluff, should_make_mistake
 from app.decision.board_texture import BoardTexture, classify_board_texture
 from app.decision.draw_detector import detect_draws
-from app.decision.hand_strength import evaluate_draw_strength, evaluate_postflop_strength
+from app.decision.game_rules import is_omaha
+from app.decision.hand_evaluator import HandRank
+from app.decision.hand_strength import combined_strength, evaluate_draw_strength, evaluate_hand
 from app.decision.pot_odds import calculate_pot_odds, call_amount
 from app.schemas.bot_action_schema import BotAction, BotActionProposal
 from app.schemas.bot_job_schema import BotTurnJob
+from app.schemas.game_state_schema import Street
 
 
 def decide_postflop(job: BotTurnJob, profile: BotProfile) -> BotActionProposal:
-    made_strength, hand_label = evaluate_postflop_strength(job.bot_hole_cards, job.board_cards)
+    evaluation = evaluate_hand(job.bot_hole_cards, job.board_cards, job.street, job.game_type)
+    hand_label = evaluation.label
     raw_draw_strength = evaluate_draw_strength(job.bot_hole_cards, job.board_cards)
-    draws = detect_draws(job.bot_hole_cards, job.board_cards)
-    draw_strength = 0.0 if job.street.value == "RIVER" else raw_draw_strength
-    total_strength = min(1.0, made_strength + draw_strength * 0.65)
+    draws = detect_draws(job.bot_hole_cards, job.board_cards, job.game_type)
+    draw_strength = 0.0 if job.street == Street.RIVER else max(raw_draw_strength, draws.equity_estimate * 0.5)
+    total_strength = combined_strength(evaluation, draw_strength, job.street)
+    made_strength = evaluation.strength
     call_cost = call_amount(job.current_bet, job.bot_current_bet, job.bot_stack)
     odds = calculate_pot_odds(job.pot_size, call_cost)
     texture = classify_board_texture(job.board_cards)
@@ -27,7 +32,12 @@ def decide_postflop(job: BotTurnJob, profile: BotProfile) -> BotActionProposal:
     if should_make_mistake(profile):
         total_strength = max(0.0, min(1.0, total_strength + (-0.12 if random_bool(0.65) else 0.10)))
 
-    made_category = _made_category(made_strength)
+    if is_omaha(job.game_type):
+        total_strength *= 0.94
+        if multiway:
+            total_strength *= 0.90
+
+    made_category = _made_category(evaluation.rank, made_strength, is_omaha(job.game_type))
     strong_draw = draws.combo_draw or draws.nut_flush_draw or (draws.flush_draw and draws.open_ended_straight_draw)
 
     if BotAction.ALL_IN in job.legal_actions and job.bot_stack <= max(job.pot_size, call_cost * 3):
@@ -131,14 +141,19 @@ def decide_postflop(job: BotTurnJob, profile: BotProfile) -> BotActionProposal:
     return _fold_or_check(job, f"Insufficient equity with {hand_label}")
 
 
-def _made_category(made_strength: float) -> str:
-    if made_strength >= 0.86:
+def _made_category(rank: HandRank, made_strength: float, omaha: bool = False) -> str:
+    bump = 0.04 if omaha else 0.0
+    if rank >= HandRank.FULL_HOUSE:
         return "MONSTER"
-    if made_strength >= 0.64:
+    if rank >= HandRank.STRAIGHT or made_strength >= 0.72 + bump:
         return "VERY_STRONG"
-    if made_strength >= 0.54:
+    if rank >= HandRank.THREE_OF_A_KIND or made_strength >= 0.62 + bump:
+        return "VERY_STRONG"
+    if rank == HandRank.TWO_PAIR or made_strength >= 0.54 + bump:
         return "STRONG_ONE_PAIR"
-    if made_strength >= 0.40:
+    if rank == HandRank.PAIR and made_strength >= 0.48 + bump:
+        return "STRONG_ONE_PAIR"
+    if rank == HandRank.PAIR or made_strength >= 0.40 + bump:
         return "MEDIUM"
     return "WEAK"
 

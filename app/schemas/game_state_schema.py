@@ -40,7 +40,7 @@ class Position(StrEnum):
 class VisibleGameState(BaseModel):
     street: Street
     game_type: GameType = Field(alias="gameType")
-    bot_hole_cards: list[str] = Field(alias="botHoleCards", min_length=2, max_length=2)
+    bot_hole_cards: list[str] = Field(alias="botHoleCards", min_length=2, max_length=7)
     board_cards: list[str] = Field(default_factory=list, alias="boardCards", max_length=5)
     pot_size: int = Field(alias="potSize", ge=0)
     current_bet: int = Field(alias="currentBet", ge=0)

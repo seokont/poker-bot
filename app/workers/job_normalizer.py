@@ -3,6 +3,7 @@ from typing import Any
 from app.schemas.backend_queue_schema import BackendBotQueueJob
 from app.schemas.bot_action_schema import BotAction
 from app.schemas.bot_job_schema import BotTurnJob
+from app.decision.game_rules import expected_hole_card_count
 from app.schemas.game_state_schema import GameType, Position, Street
 
 
@@ -38,10 +39,11 @@ def normalize_backend_queue_job(payload: dict[str, Any]) -> BotTurnJob:
         "cards",
         default=None,
     )
+    game_type = _normalize_game_type(raw.game_type)
     if not hole_cards:
         # The external queue format may omit cards in minimal test jobs. Use placeholders only to reach safe fallback logic.
         # Production backend should always include the bot's own hole cards in visibleState.
-        hole_cards = ["As", "Kd"]
+        hole_cards = _default_hole_cards(game_type)
 
     return BotTurnJob.model_validate(
         {
@@ -50,7 +52,7 @@ def normalize_backend_queue_job(payload: dict[str, Any]) -> BotTurnJob:
             "handId": raw.hand_id,
             "turnId": raw.turn_id,
             "street": _normalize_street(raw.street),
-            "gameType": _normalize_game_type(raw.game_type),
+            "gameType": game_type,
             "botHoleCards": _normalize_cards(hole_cards),
             "boardCards": _normalize_board_cards(raw.street, board_cards),
             "potSize": _get(state, "potSize", "pot", "mainPot", default=_sum_pots(state)),
@@ -167,12 +169,30 @@ def _normalize_street(value: str) -> str:
 
 
 def _normalize_game_type(value: str) -> str:
-    value = value.upper()
-    if value == "TEXAS_HOLDEM":
-        return GameType.TEXAS_HOLDEM.value
-    if value in {"NLH", "NO_LIMIT_HOLDEM"}:
-        return GameType.NO_LIMIT_HOLDEM.value
+    value = value.upper().replace("-", "_")
+    aliases = {
+        "TEXAS_HOLDEM": GameType.TEXAS_HOLDEM.value,
+        "NLH": GameType.NO_LIMIT_HOLDEM.value,
+        "NO_LIMIT_HOLDEM": GameType.NO_LIMIT_HOLDEM.value,
+        "HOLDEM": GameType.NLH.value,
+        "OMAHA": GameType.OMAHA_4.value,
+        "PLO": GameType.OMAHA_4.value,
+        "PLO4": GameType.OMAHA_4.value,
+        "PLO5": GameType.OMAHA_5.value,
+        "PLO6": GameType.OMAHA_6.value,
+        "PLO7": GameType.OMAHA_7.value,
+    }
+    if value in aliases:
+        return aliases[value]
+    if value in {game.value for game in GameType}:
+        return value
     return GameType.TEXAS_HOLDEM.value
+
+
+def _default_hole_cards(game_type: str) -> list[str]:
+    count = expected_hole_card_count(GameType(game_type))
+    template = ["As", "Kd", "Qh", "Jc", "Ts", "9d", "8h"]
+    return template[:count]
 
 
 def _normalize_position(value: str) -> str:
