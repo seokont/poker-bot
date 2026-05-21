@@ -12,7 +12,7 @@ from app.integrations.database import SessionLocal, create_database_tables
 from app.integrations.game_engine_client import GameEngineClient
 from app.integrations.redis_client import get_redis_client, set_json
 from app.models.bot_action_log_model import BotActionLogModel
-from app.redis.locks import acquire_bot_turn_lock, release_bot_turn_lock
+from app.redis.locks import acquire_bot_turn_lock, release_bot_turn_lock, sent_action_key
 from app.schemas.bot_action_schema import BotAction, BotActionProposal
 from app.schemas.bot_job_schema import BotTurnJob
 from app.schemas.game_state_schema import Street
@@ -29,7 +29,7 @@ def process_bot_action(self, payload: dict) -> dict:
 def process_bot_turn_job(job: BotTurnJob, retry_callback=None) -> dict:
     settings = get_settings()
     redis_client = get_redis_client()
-    sent_key = f"sent:bot:{job.bot_id}:hand:{job.hand_id}:turn:{job.turn_id}"
+    sent_key = sent_action_key(job.bot_id, job.hand_id, job.turn_id)
 
     if redis_client.exists(sent_key):
         return {"status": "duplicate_ignored", "botId": job.bot_id, "turnId": job.turn_id}
@@ -44,6 +44,19 @@ def process_bot_turn_job(job: BotTurnJob, retry_callback=None) -> dict:
             return {"status": "disabled", "botId": job.bot_id}
 
         delay_ms = calculate_thinking_delay_ms(job, profile)
+        lock_ttl_seconds = max(settings.bot_lock_ttl_seconds, int(delay_ms / 1000) + 45)
+        lock_acquired = wait_for_turn_lock(
+            redis_client,
+            job.bot_id,
+            job.hand_id,
+            job.turn_id,
+            sent_key,
+            lock_ttl_seconds,
+            settings.bot_turn_lock_wait_seconds,
+        )
+        if redis_client.exists(sent_key):
+            return {"status": "duplicate_ignored", "botId": job.bot_id, "turnId": job.turn_id}
+
         set_json(
             redis_client,
             f"bot:{job.bot_id}:state",
@@ -63,29 +76,20 @@ def process_bot_turn_job(job: BotTurnJob, retry_callback=None) -> dict:
 
         if redis_client.exists(sent_key):
             return {"status": "duplicate_ignored", "botId": job.bot_id, "turnId": job.turn_id}
-        lock_acquired = acquire_bot_turn_lock(redis_client, job.bot_id, job.hand_id, job.turn_id)
-        if not lock_acquired:
-            log_action(
-                db,
-                job,
-                DecisionEngine.safe_default(job, "Duplicate lock exists").model_dump(mode="json"),
-                "DUPLICATE",
-                delay_ms,
-                profile.profile_type.value,
-            )
-            return {"status": "duplicate_ignored", "botId": job.bot_id, "turnId": job.turn_id}
 
         client = GameEngineClient()
-        if not client.check_bot_turn_validity(job):
+        validate_ok = client.check_bot_turn_validity(job)
+        if not validate_ok:
             log_action(
                 db,
                 job,
-                DecisionEngine.safe_default(job, "Stale job or no longer bot turn").model_dump(mode="json"),
-                "STALE",
+                DecisionEngine.safe_default(job, "validate-turn rejected; still attempting send").model_dump(
+                    mode="json"
+                ),
+                "VALIDATE_WARN",
                 delay_ms,
                 profile.profile_type.value,
             )
-            return {"status": "stale_ignored", "botId": job.bot_id, "turnId": job.turn_id}
 
         try:
             proposal = DecisionEngine().decide(job, profile)
@@ -94,13 +98,19 @@ def process_bot_turn_job(job: BotTurnJob, retry_callback=None) -> dict:
         proposal = normalize_proposal_for_table(job, proposal)
 
         try:
-            client.send_bot_action(job, proposal)
+            send_bot_action_with_retries(
+                client,
+                job,
+                proposal,
+                max_attempts=settings.bot_action_send_retries,
+                retry_callback=retry_callback,
+            )
         except Exception as exc:
             log_action(db, job, proposal.model_dump(mode="json"), "SEND_FAILED", delay_ms, profile.profile_type.value)
             if retry_callback is not None:
                 raise retry_callback(exc)
             raise
-        redis_client.set(sent_key, "1", ex=settings.bot_lock_ttl_seconds)
+        redis_client.set(sent_key, "1", ex=lock_ttl_seconds)
         set_json(
             redis_client,
             f"recent:bot:{job.bot_id}:actions",
@@ -139,6 +149,49 @@ def process_bot_turn_job(job: BotTurnJob, retry_callback=None) -> dict:
         if lock_acquired:
             release_bot_turn_lock(redis_client, job.bot_id, job.hand_id, job.turn_id)
         db.close()
+
+
+def wait_for_turn_lock(
+    redis_client,
+    bot_id: str,
+    hand_id: str,
+    turn_id: str,
+    sent_key: str,
+    lock_ttl_seconds: int,
+    max_wait_seconds: int,
+) -> bool:
+    deadline = time.monotonic() + max_wait_seconds
+    while time.monotonic() < deadline:
+        if redis_client.exists(sent_key):
+            return False
+        if acquire_bot_turn_lock(redis_client, bot_id, hand_id, turn_id, ttl_seconds=lock_ttl_seconds):
+            return True
+        time.sleep(0.25)
+    return acquire_bot_turn_lock(redis_client, bot_id, hand_id, turn_id, ttl_seconds=lock_ttl_seconds)
+
+
+def send_bot_action_with_retries(
+    client: GameEngineClient,
+    job: BotTurnJob,
+    proposal: BotActionProposal,
+    max_attempts: int,
+    retry_callback=None,
+) -> None:
+    last_exc: Exception | None = None
+    for attempt in range(max(1, max_attempts)):
+        try:
+            client.send_bot_action(job, proposal)
+            return
+        except Exception as exc:
+            last_exc = exc
+            if attempt < max_attempts - 1:
+                time.sleep(min(5.0, 1.0 * (attempt + 1)))
+                continue
+            if retry_callback is not None:
+                raise retry_callback(exc)
+            raise last_exc
+    if last_exc is not None:
+        raise last_exc
 
 
 def calculate_thinking_delay_ms(job: BotTurnJob, profile) -> int:

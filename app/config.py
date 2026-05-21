@@ -22,7 +22,17 @@ class Settings(BaseSettings):
     # Avoid `bot:job:` — many backends reuse that pattern for non-string types (WRONGTYPE on GET).
     bot_job_payload_prefix: str = Field(default="poker_bot_server:job:", alias="BOT_JOB_PAYLOAD_PREFIX")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
-    bot_lock_ttl_seconds: int = Field(default=15, alias="BOT_LOCK_TTL_SECONDS")
+    bot_lock_ttl_seconds: int = Field(
+        default=90,
+        alias="BOT_LOCK_TTL_SECONDS",
+        description="Redis lock TTL while a bot turn is being processed (covers thinking delay).",
+    )
+    bot_turn_lock_wait_seconds: int = Field(
+        default=25,
+        alias="BOT_TURN_LOCK_WAIT_SECONDS",
+        description="How long to wait for another worker's turn lock before sending anyway.",
+    )
+    bot_action_send_retries: int = Field(default=3, alias="BOT_ACTION_SEND_RETRIES")
     request_timeout_seconds: float = Field(
         default=30.0,
         alias="REQUEST_TIMEOUT_SECONDS",
