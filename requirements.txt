@@ -7,3 +7,4 @@ psycopg2-binary
 pydantic
 pydantic-settings
 httpx
+pokerkit==0.7.3

@@ -4,7 +4,7 @@ from app.decision.bluff_logic import should_bluff, should_make_mistake
 from app.decision.board_texture import BoardTexture, classify_board_texture
 from app.decision.draw_detector import detect_draws
 from app.decision.game_rules import is_omaha
-from app.decision.hand_evaluator import HandRank
+from app.decision.hand_types import HandRank
 from app.decision.hand_strength import combined_strength, evaluate_draw_strength, evaluate_hand
 from app.decision.pot_odds import calculate_pot_odds, call_amount
 from app.schemas.bot_action_schema import BotAction, BotActionProposal
