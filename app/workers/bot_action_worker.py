@@ -9,7 +9,7 @@ from app.config import get_settings
 from app.decision.decision_engine import DecisionEngine
 from app.decision.randomness import occasional_slowdown_ms
 from app.integrations.database import SessionLocal, create_database_tables
-from app.integrations.game_engine_client import GameEngineClient
+from app.integrations.game_engine_client import BotTurnAlreadyProcessedError, GameEngineClient
 from app.integrations.redis_client import get_redis_client, set_json
 from app.models.bot_action_log_model import BotActionLogModel
 from app.redis.locks import acquire_bot_turn_lock, release_bot_turn_lock, sent_action_key
@@ -98,7 +98,7 @@ def process_bot_turn_job(job: BotTurnJob, retry_callback=None) -> dict:
         proposal = normalize_proposal_for_table(job, proposal)
 
         try:
-            send_bot_action_with_retries(
+            send_status = send_bot_action_with_retries(
                 client,
                 job,
                 proposal,
@@ -110,6 +110,7 @@ def process_bot_turn_job(job: BotTurnJob, retry_callback=None) -> dict:
             if retry_callback is not None:
                 raise retry_callback(exc)
             raise
+        log_status = "ALREADY_PROCESSED" if send_status == "already_processed" else "SENT"
         redis_client.set(sent_key, "1", ex=lock_ttl_seconds)
         set_json(
             redis_client,
@@ -117,7 +118,7 @@ def process_bot_turn_job(job: BotTurnJob, retry_callback=None) -> dict:
             {"handId": job.hand_id, "turnId": job.turn_id, "action": proposal.action.value, "amount": proposal.amount},
             ttl_seconds=3600,
         )
-        log_action(db, job, proposal.model_dump(mode="json"), "SENT", delay_ms, profile.profile_type.value)
+        log_action(db, job, proposal.model_dump(mode="json"), log_status, delay_ms, profile.profile_type.value)
         record_bot_action_stats(db, job, proposal.action)
         set_json(
             redis_client,
@@ -135,7 +136,7 @@ def process_bot_turn_job(job: BotTurnJob, retry_callback=None) -> dict:
             ttl_seconds=3600,
         )
         return {
-            "status": "sent",
+            "status": send_status,
             "botId": job.bot_id,
             "turnId": job.turn_id,
             "action": proposal.action.value,
@@ -176,12 +177,14 @@ def send_bot_action_with_retries(
     proposal: BotActionProposal,
     max_attempts: int,
     retry_callback=None,
-) -> None:
+) -> str:
     last_exc: Exception | None = None
     for attempt in range(max(1, max_attempts)):
         try:
             client.send_bot_action(job, proposal)
-            return
+            return "sent"
+        except BotTurnAlreadyProcessedError:
+            return "already_processed"
         except Exception as exc:
             last_exc = exc
             if attempt < max_attempts - 1:
@@ -192,6 +195,7 @@ def send_bot_action_with_retries(
             raise last_exc
     if last_exc is not None:
         raise last_exc
+    return "sent"
 
 
 def calculate_thinking_delay_ms(job: BotTurnJob, profile) -> int:

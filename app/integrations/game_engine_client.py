@@ -12,6 +12,25 @@ class GameEngineApplicationError(Exception):
         super().__init__(str(message))
 
 
+class BotTurnAlreadyProcessedError(GameEngineApplicationError):
+    """Raised when the main backend reports the turn was already applied (idempotent duplicate)."""
+
+
+def is_already_processed_payload(payload: dict) -> bool:
+    message = str(payload.get("message") or payload.get("error") or "").lower()
+    error_code = str(payload.get("errorCode") or "").upper()
+    return (
+        error_code
+        in {
+            "BOT_ACTION_ALREADY_PROCESSED",
+            "ALREADY_PROCESSED",
+            "TURN_ALREADY_PROCESSED",
+        }
+        or "already been processed" in message
+        or "already processed" in message
+    )
+
+
 class GameEngineClient:
     def __init__(self) -> None:
         self.settings = get_settings()
@@ -24,6 +43,8 @@ class GameEngineClient:
         response.raise_for_status()
         payload = response.json() if response.content else {"ok": True}
         if isinstance(payload, dict) and payload.get("ok") is False:
+            if is_already_processed_payload(payload):
+                raise BotTurnAlreadyProcessedError(payload)
             raise GameEngineApplicationError(payload)
         return payload if isinstance(payload, dict) else {"ok": True, "data": payload}
 
